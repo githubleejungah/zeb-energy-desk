@@ -1,0 +1,38 @@
+# site/ 폴더만 GitHub Pages로 올린다. 올리기(build)와 배포(deploy)는 다른 작업으로 나눈다.
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 비밀값 검사(0건이어야 배포, AC-54)
+        run: node tools/secret_scan.mjs .
+      - name: 시험(골든셋 · 알람 사례 · 보안 · 성능)
+        run: node tools/run-tests.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

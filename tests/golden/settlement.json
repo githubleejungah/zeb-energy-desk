@@ -1,0 +1,18 @@
+{
+  "_설명": "2026-08 정산 골든셋. 가상 단가: 프로 3,000원 · 운영대행 9,000원(개소당 월). 원 미만 버림.",
+  "month": "2026-08",
+  "cases": [
+    { "name": "한 달 전체 · 회사 장애 6시간 → 10% (SO-1)", "contractorId": "K1", "assetId": "PV-01", "days": 31, "feeWon": 3000, "creditWon": 300, "billedWon": 2700 },
+    { "name": "회사 장애 26시간 → 30% (SO-2)", "contractorId": "K2", "assetId": "PV-25", "days": 31, "feeWon": 9000, "creditWon": 2700, "billedWon": 6300 },
+    { "name": "달 중간 설치 8/12 → 20일 일할", "contractorId": "K2", "assetId": "PV-29", "days": 20, "feeWon": 5806, "creditWon": 0, "billedWon": 5806 },
+    { "name": "계약 종료 8/25 → 25일", "contractorId": "K3", "assetId": "PV-30", "days": 25, "feeWon": 2419, "creditWon": 0, "billedWon": 2419 },
+    { "name": "담당 이관 8/16 · 앞 시공사 15일", "contractorId": "K2", "assetId": "PV-31", "days": 15, "feeWon": 4354, "creditWon": 0, "billedWon": 4354 },
+    { "name": "담당 이관 8/16 · 새 시공사 16일", "contractorId": "K1", "assetId": "PV-31", "days": 16, "feeWon": 1548, "creditWon": 0, "billedWon": 1548 },
+    { "name": "원인 미판정 장애(SO-3)는 판정 전 감면 0", "contractorId": "K1", "assetId": "PV-13", "days": 31, "feeWon": 3000, "creditWon": 0, "billedWon": 3000 }
+  ],
+  "decided": [
+    { "name": "SO-3을 회사 책임으로 판정 → 5시간 → 10%", "decision": "company", "contractorId": "K1", "assetId": "PV-13", "creditWon": 300 },
+    { "name": "SO-3을 현장 원인으로 판정 → 감면 0", "decision": "field", "contractorId": "K1", "assetId": "PV-13", "creditWon": 0 }
+  ],
+  "notBilled": ["PV-32"]
+}

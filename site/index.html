@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>제로에너지 단지 운영 데스크 (시연)</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>제로에너지 단지 운영 데스크</h1>
+      <p class="sub">가상 단지 하나 · 네 사람의 화면 · 설치부터 유지관리까지</p>
+    </div>
+    <nav class="roles" aria-label="역할 바꾸기">
+      <button type="button" data-role="contractor">시공사</button>
+      <button type="button" data-role="resident">입주민</button>
+      <button type="button" data-role="complex">건설사 · 관리주체</button>
+      <button type="button" data-role="hq">본사 운영자</button>
+    </nav>
+    <div class="clock">
+      <span id="clock"></span>
+      <button type="button" id="plus1h" class="btn ghost">1시간 앞으로</button>
+      <button type="button" id="plus1d" class="btn ghost">1일 앞으로</button>
+      <button type="button" id="reset" class="btn ghost">시연 초기화</button>
+    </div>
+  </header>
+  <p id="notice" class="warnbox" role="status" hidden></p>
+  <main id="main" aria-live="polite"></main>
+  <footer class="foot">
+    <p>가상 데이터 시연입니다. 역할 나누기는 시연이며 실제 제품은 서버가 권한을 검사합니다. 실제 회사 · 고객 · 가격이 아닙니다. 숫자 기준은 가상 시작값입니다.</p>
+    <p class="muted small"><span id="perf"></span> · 외부로 보내는 요청 없음 · 데이터는 이 브라우저에만 저장</p>
+  </footer>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
