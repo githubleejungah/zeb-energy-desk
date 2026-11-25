@@ -41,9 +41,9 @@ export function renderComplex(v, api) {
 }
 
 function siteCheckBox(a, api) {
-  const head = h('p', null, h('strong', null, a.assetId), ' ', chip(CAUSE[a.cause], a.cause === 'safety' ? 'al-safety' : 'al-fault'), chip(a.status, STATUS_CLASS[a.status]), ` 하루 손실 ${won(a.dayLossWon)} · ${when(a.firstH)}부터`);
+  const head = h('p', null, h('strong', null, a.assetId), ' ', chip(CAUSE[a.cause], a.cause === 'safety' ? 'al-safety' : a.cause === 'comm' ? 'al-est' : 'al-fault'), chip(a.status, STATUS_CLASS[a.status]), ` ${a.dayLossWon === null || a.dayLossWon === undefined ? `${a.cause === 'comm' ? '끊김' : '가동 저하'} ${a.impactHours ?? 0}시간` : `하루 손실 ${won(a.dayLossWon)}`} · ${when(a.firstH)}부터`);
   if (a.expertOnly) return h('div', { class: 'dangerbox' }, head, h('p', null, '전문가만 조치 — 가까이 가지 말고 시공사 · 본사 연락을 기다리세요.'));
-  if (a.siteCheck) return h('div', { class: 'okbox' }, head, h('p', null, a.siteCheck.result === 'solved' ? `1차 확인: 해결(${when(a.siteCheck.atH)}) — 다음 날 해 뜬 시간에 정상 복귀를 확인합니다.` : `1차 확인: 안 됨(${when(a.siteCheck.atH)}) — 시공사에 전달했습니다.`));
+  if (a.siteCheck) return h('div', { class: 'okbox' }, head, h('p', null, a.siteCheck.result === 'solved' ? `1차 확인: 해결(${when(a.siteCheck.atH)}) — 확인 뒤 첫 해 뜬 시간에 정상 복귀를 확인합니다.` : `1차 확인: 안 됨(${when(a.siteCheck.atH)}) — 시공사에 전달했습니다.`));
   const boxes = a.checklist.map((item) => h('label', { class: 'chk' }, h('input', { type: 'checkbox', value: item }), ` ${item} 확인`));
   const picked = () => boxes.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
   return h('div', { class: 'card' }, head, h('div', { class: 'acts' }, boxes),

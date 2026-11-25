@@ -8,22 +8,22 @@ import * as act from '../site/js/core/actions.js';
 const now = seed.config.startH;
 const complexView = (r) => forRole(seed, r.snap, 'complex');
 
-test('test_ac60_공용 설비 일반 알람에 1차 확인 체크리스트 3개', () => {
-  const v = complexView(run(fresh().state));
-  const a = v.commonAlarms.find((x) => x.assetId === 'GEO-1');
-  assert.deepEqual(a.checklist, ['인버터 표시등', '차단기', '통신 장치 전원']);
+test('test_ac60_공용 설비 일반 알람에 설비 종류별 1차 확인 체크리스트 3개', () => {
+  const v = complexView(run({ ...fresh().state, clockH: D(30, 12) })); // GEO-1 저하가 열려 있는 때(8/31 12시)
+  assert.deepEqual(v.commonAlarms.find((x) => x.assetId === 'GEO-1').checklist, ['운전 표시등', '차단기', '통신 장치 전원']);
+  assert.deepEqual(complexView(run(fresh().state)).commonAlarms.find((x) => x.assetId === 'A-103').checklist, ['인버터 표시등', '차단기', '통신 장치 전원']);
   assert.ok(!v.commonAlarms.some((x) => x.assetId.startsWith('PV-'))); // 단독주택 설비는 관리주체 화면에 없음
 });
 
-test('test_ac61_해결 → 조치입력 → 다음 날 복귀 확인으로 종결', () => {
-  // GEO-1 저하는 8/31 08시에 이미 끝남 → 해결 입력 뒤 다음 날 07시 확인에서 종결
-  let st = act.siteCheck(fresh().state, { key: 'GEO-1:low', result: 'solved', items: ['차단기'] });
+test('test_ac61_해결 → 조치입력 → 조치 뒤 첫 해 뜬 시간 복귀 확인으로 종결', () => {
+  // GEO-1 저하는 8/31 08시에 끝남 → 8/31 12시 '해결' → 9/1 07시 확인에서 종결(자동 회복 9/1 08시보다 먼저)
+  let st = act.siteCheck({ ...fresh().state, clockH: D(30, 12) }, { key: 'GEO-1:low', result: 'solved', items: ['차단기'] });
   let r = run(st);
   assert.equal(r.snap.alarms.find((a) => a.assetId === 'GEO-1').status, '조치입력');
-  st = act.advanceClock(st, 24);
+  st = act.advanceClock(st, 19); // 9/1 07시
   r = run(st);
   assert.ok(!r.snap.alarms.some((a) => a.assetId === 'GEO-1'));
-  assert.ok(r.snap.closedAlarms.some((a) => a.assetId === 'GEO-1' && a.status === '종결'));
+  assert.ok(r.snap.closedAlarms.some((a) => a.assetId === 'GEO-1' && a.status === '종결' && a.closedH === D(31, 7) && !a.closeReason));
 });
 
 test('test_ac62_안 됨 → 시공사 화면에 1줄 · 상태 그대로', () => {

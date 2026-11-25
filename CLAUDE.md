@@ -13,7 +13,7 @@
 - push · 배포는 사용자 승인 뒤. Pages 배포는 올리기와 배포를 다른 작업으로 나눈다.
 
 ## 자주 쓰는 명령
-- 요구 문서 검사: `python "C:/dev/workspace-igm/self study/ref-project/sdd/99_toolchain/01_automation/doc_lint.py" ears docs/requirements.md --strict`
+- 요구 문서 검사: `python doc_lint.py ears docs/requirements.md --strict` (EARS 문장 검사 도구, 저장소 밖 강의 작업 공간에 있음)
 - 시험: `node tools/run-tests.mjs` (결과 `tmp/test-results.json`, 건너뜀은 실패로 셈)
 - 비밀값 검사: `node tools/secret_scan.mjs .`
 - 로컬 보기: `python -m http.server 8794 -d site`

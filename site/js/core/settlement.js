@@ -1,6 +1,7 @@
 // 정산 모듈 — 요금 · 감면 · 포인트 계산은 이 파일에서만 한다(AC-30).
 // 세대 15분 원본(raw.js)을 읽는 유일한 파일이다(AC-46 · SEC-08).
-import { householdUsage, householdIds, RawDeletedError } from './raw.js';
+import { householdUsage, householdIds, baselineHourly, isResponsive, RawDeletedError, BaselineExpiredError } from './raw.js';
+import { rand } from './prng.js';
 import { missionHourOf } from './telemetry.js';
 import { ownerAt } from './alarms.js';
 import { dayOf, monthOfDay, monthRange, isWeekday, fromDateStr } from './time.js';
@@ -74,8 +75,16 @@ export function approvedBudget(state, H) {
   return state.budgets.filter((b) => b.approvedH <= H).reduce((s, b) => s + b.approvedWon, 0);
 }
 
+// 미션 참여 신청(AC-76): 기본은 반응 세대 전부 + 일부(가상, AS-14). 입주민이 바꾼 값이 있으면 그 시각부터 그 값.
+export function joined(seed, state, hid, H) {
+  const o = state.optIns?.[hid];
+  if (o && o.atH <= H) return o.on;
+  return isResponsive(hid) || rand('join', hid) < seed.config.optInExtraRate;
+}
+
 // isMissionDay(d): 그날 미션이 열렸는지. 기준선에서 뺀다(AC-38, 영국 Octopus 방식).
-export function judge(seed, hid, day, hour, usageOf, isMissionDay = () => false) {
+// baselineOf(hid, d): 기준선용 1시간 합계(AC-75). 없으면 usageOf에서 1시간 합계를 만든다(시험용).
+export function judge(seed, hid, day, hour, usageOf, isMissionDay = () => false, baselineOf = null) {
   const cfg = seed.config;
   const sumHour = (arr) => {
     const q = arr.slice(hour * 4, hour * 4 + 4);
@@ -88,9 +97,8 @@ export function judge(seed, hid, day, hour, usageOf, isMissionDay = () => false)
   const base = [];
   for (let d = day - 1; d >= day - cfg.missionBaselineLookbackDays && base.length < cfg.missionBaselineDays; d--) {
     if (!isWeekday(d) || isMissionDay(d)) continue;
-    let arr;
-    try { arr = usageOf(hid, d); } catch (e) { if (e instanceof RawDeletedError) continue; throw e; }
-    const v = sumHour(arr);
+    let v;
+    try { v = baselineOf ? baselineOf(hid, d)[hour] : sumHour(usageOf(hid, d)); } catch (e) { if (e instanceof RawDeletedError || e instanceof BaselineExpiredError) continue; throw e; }
     if (v !== null) base.push(v);
   }
   if (base.length < cfg.missionBaselineDays) return { verdict: 'undecidable', points: 0, ratioPct: null, blanks, reason: 'baseline' }; // AC-59
@@ -150,8 +158,10 @@ export function missions(seed, state, now, deletedMonths = []) {
     if (startH + 1 > now) { out.push({ day, hour, status: 'open' }); continue; }
     const results = {};
     let moved = 0;
+    const baselineOf = (hid, d) => baselineHourly(seed, hid, d, startH); // AC-75 판정 시각 앞 30일까지
     for (const hid of ids) {
-      const r = judge(seed, hid, day, hour, usageOf, isMissionDay);
+      if (!joined(seed, state, hid, startH)) continue; // AC-76 신청 세대만 판정
+      const r = judge(seed, hid, day, hour, usageOf, isMissionDay, baselineOf);
       moved += r.movedKwh ?? 0;
       results[hid] = { verdict: r.verdict, points: r.points, ratioPct: r.ratioPct, blanks: r.blanks };
     }

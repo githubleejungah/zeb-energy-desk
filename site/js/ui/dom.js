@@ -38,8 +38,11 @@ export const won = (n) => `${Number(n ?? 0).toLocaleString('ko-KR')}원`;
 export const when = (H) => (H === null || H === undefined ? '—' : fmt(H));
 
 export const CAUSE = { safety: '안전', low: '발전 · 가동 저하', comm: '통신 끊김' };
-export const STATUS_CLASS = { 열림: 'st-open', 본사대기: 'st-hq', 묶임: 'st-bundle', 보류: 'st-bundle', 출동확정: 'st-go', 조치입력: 'st-fix', 종결: 'st-done' };
-export const OWNER = { HQ: '본사', PUB: '공공 사후관리 기관(가상)' };
+export const STATUS_CLASS = { 열림: 'st-open', 본사대기: 'st-hq', 묶임: 'st-bundle', 보류: 'st-bundle', 출동확정: 'st-go', 조치입력: 'st-fix', 종결: 'st-done', 기관전달: 'st-bundle' };
+// 손실 칸: 태양광은 원, 지열 · 충전기는 영향 시간(AC-77)
+export const lossText = (a) => (a.lossWon === null || a.lossWon === undefined ? `${a.cause === 'comm' ? '끊김' : '가동 저하'} ${a.impactHours ?? 0}시간` : won(a.lossWon));
+export const dayLossText = (a) => (a.dayLossWon === null || a.dayLossWon === undefined ? '—(금액 없음)' : won(a.dayLossWon));
+export const OWNER = { HQ: '본사', PUB: '공공 사후관리 기관(가상)', END: '관리 종료' };
 
 export function chip(text, cls) {
   return h('span', { class: `chip ${cls ?? ''}` }, text);

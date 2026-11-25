@@ -36,7 +36,15 @@ export const config = {
   holdMaxHours: 14 * 24, // AC-65 보류 최대 14일(AS-11)
   holdLossLimitWon: 30000, // AC-65 보류 뒤 손실 한도(AS-11)
   hqTempMaxHours: 30 * 24, // AC-67 본사 임시 관리 30일(AS-11)
-  siteCheckItems: ['인버터 표시등', '차단기', '통신 장치 전원'], // AC-60(AS-11)
+  siteCheckItems: { pv: ['인버터 표시등', '차단기', '통신 장치 전원'], other: ['운전 표시등', '차단기', '통신 장치 전원'] }, // AC-60 설비 종류별(AS-11)
+  resultDueHours: 7 * 24, // AC-70 출동 확정 뒤 조치 기한(AS-13)
+  autoRecoverHours: 24, // AC-79 이어서 정상이면 자동 회복(AS-13)
+  baselineHourlyRetentionDays: 30, // AC-75 기준선용 1시간 합계 보관(AS-8)
+  optInExtraRate: 0.15, // AC-76 반응 세대가 아닌데 신청한 세대 비율(가상, AS-14)
+  missionWindowStartHour: 10, // AC-37 미션을 찾는 시간대 [10, 15)(AS-10)
+  missionWindowEndHour: 15,
+  ownBaselineDays: 7, // 지열 · 충전기 비교 기준: 자기 직전 7일 같은 시간 평균(AS-6)
+  minNeighborYield: 0.02, // 이웃 평균이 이보다 작으면(해 뜰 무렵) 비교하지 않음
 };
 
 export const complex = {

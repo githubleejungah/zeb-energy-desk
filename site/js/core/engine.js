@@ -7,6 +7,7 @@ import { exceptions, closeLockReasons } from './exceptions.js';
 import { preview, missions, partnerReport, deletedMonths, rawDeletionCount } from './settlement.js';
 import { complexGen, complexLoad } from './telemetry.js';
 import { append, hasKey } from './audit.js';
+import { days } from './labels.js';
 import { dayOf, hourOf, monthOfDay, monthRange, fromDateStr } from './time.js';
 
 export function closeMonthOf(now) {
@@ -24,14 +25,14 @@ export function snapshot(seed, state) {
   const ms = missions(seed, state, now, deleted);
   const pendingAppeals = state.appeals.filter((a) => !a.decision);
   const closeMonth = closeMonthOf(now);
-  const lockReasons = closeLockReasons(ar, exc, pendingAppeals);
+  const lockReasons = closeLockReasons(ar, exc, pendingAppeals, monthRange(monthOfDay(dayOf(now))).startDay * 24); // AC-32 지난달 말일까지 생긴 것
   const day = dayOf(now);
   const hoursToday = hourOf(now);
   const complexHourly = Array.from({ length: hoursToday }, (_, h) => ({ hour: h, genKwh: complexGen(seed, day, h), loadKwh: complexLoad(day, h) }));
   const owners = Object.fromEntries(seed.assets.map((a) => [a.id, ownerAt(seed, a, now, state.ownerOverrides ?? {})]));
   const proposalsBy = Object.fromEntries([...seed.contractors.map((c) => c.id), 'HQ'].map((id) => [id, proposals(seed, ar, id)]));
   return {
-    now, day, deletedMonths: deleted, owners,
+    now, day, deletedMonths: deleted, owners, optIns: state.optIns ?? {},
     alarms: ar.alarms, workOrders: ar.workOrders, closedAlarms: ar.closedAlarms,
     proposals: proposalsBy, obligations: obl, exceptions: exc,
     missions: ms, partnerReport: partnerReport(ms), pendingAppeals,
@@ -57,10 +58,17 @@ export function reconcile(seed, state, audit, snap) {
     const at = c?.contractEnd ? fromDateStr(c.contractEnd) + 24 : 0;
     au = append(au, { at: Math.min(at, snap.now), role: 'system', action: 'assign.change', target: `${a.id}:HQ`, rule: 'AC-16 담당 없는 설비 0개', key });
   }
+  // 자동 회복 종결(AC-79)은 계산으로 정해지므로 여기서 감사 기록 1줄을 남긴다.
+  for (const c of snap.closedAlarms) {
+    if (c.closeReason !== '자동 회복') continue;
+    const key = `auto:${c.id}`;
+    if (hasKey(au, key)) continue;
+    au = append(au, { at: c.closedH, role: 'system', action: 'alarm.autoclose', target: c.key, rule: `AC-79 ${seed.config.autoRecoverHours}시간 이어서 정상 · 자동 회복`, key });
+  }
   for (const month of snap.deletedMonths) {
     const key = `raw:${month}`;
     if (hasKey(au, key)) continue;
-    au = append(au, { at: snap.now, role: 'system', action: 'raw.delete', target: `${month} n=${rawDeletionCount(seed, month)}`, rule: 'AC-47 이의 기한 7일 뒤', key });
+    au = append(au, { at: snap.now, role: 'system', action: 'raw.delete', target: `${month} n=${rawDeletionCount(seed, month)}`, rule: `AC-47 이의 기한 ${days(seed.config.rawRetentionHours)} 뒤`, key });
   }
   return { state: st, audit: au };
 }

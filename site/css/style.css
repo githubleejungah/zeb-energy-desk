@@ -85,3 +85,4 @@ details { margin-top: 10px; }
 .foot { border-top: 1px solid var(--line); padding: 12px 20px 24px; margin-top: 16px; font-size: 13.5px; }
 .foot p { margin: 4px 0; }
 .chk { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 13.5px; }
+.map-no { font-size: 10px; font-weight: 700; fill: #ffffff; }

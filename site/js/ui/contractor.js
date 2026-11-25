@@ -1,6 +1,7 @@
 // 시공사 콘솔(A): 알람 · 출동 묶음 · 지도 · 의무 · 청구
-import { h, card, table, chip, stat, button, won, when, CAUSE, STATUS_CLASS } from './dom.js';
+import { h, card, table, chip, stat, button, won, when, lossText, dayLossText, CAUSE, STATUS_CLASS } from './dom.js';
 import { siteMap } from './map.js';
+import { manwon, days } from '../core/labels.js';
 
 export function renderContractor(v, api, ui) {
   const sel = ui.proposalId ? v.proposals.find((p) => p.id === ui.proposalId) : v.proposals[0];
@@ -13,16 +14,16 @@ export function renderContractor(v, api, ui) {
     a.assetId,
     chip(CAUSE[a.cause], a.cause === 'safety' ? 'al-safety' : a.estimated ? 'al-est' : 'al-fault'),
     chip(a.status, STATUS_CLASS[a.status]),
-    h('span', null, won(a.lossWon), a.estimated ? chip('추정', 'al-est') : null),
-    won(a.dayLossWon),
+    h('span', null, lossText(a), a.estimated && a.lossWon !== null ? chip('추정', 'al-est') : null),
+    dayLossText(a),
     when(a.firstH),
-    [a.escalateReason ? `본사로: ${a.escalateReason}` : '', a.reopenCount ? ` · 다시 열림 ${a.reopenCount}번` : '', a.note ? ` · ${a.note}` : '',
-      a.siteCheck?.result === 'failed' ? ' · 현장 1차 확인: 안 됨' : '', a.status === '보류' ? ` · 보류 뒤 손실 ${won(a.holdLossWon)}(한도 3만 원 · 14일)` : ''].join('').replace(/^ · /, ''),
+    [a.escalateReason ? `본사로: ${a.escalateReason}` : '', a.assignee ? ' · 본사 지정' : '', a.reopenCount ? ` · 다시 열림 ${a.reopenCount}번` : '', a.note ? ` · ${a.note}` : '',
+      a.siteCheck?.result === 'failed' ? ' · 현장 1차 확인: 안 됨' : '', a.status === '보류' ? (a.holdLossWon === null ? ` · 보류 중(한도 ${days(v.rules.holdMaxHours)})` : ` · 보류 뒤 손실 ${won(a.holdLossWon)}(한도 ${manwon(v.rules.holdLossLimitWon)} · ${days(v.rules.holdMaxHours)})`) : ''].join('').replace(/^ · /, ''),
     h('span', { class: 'memo' }, a.resultMemo ?? ''),
     actionCell(a, api, ui),
   ]);
   const woRows = v.workOrders.map((w) => [
-    w.assetId, chip(CAUSE[w.cause], 'al-fault'), chip(w.status, STATUS_CLASS[w.status]), `발생 ${w.occurrences}번`, won(w.lossWon), `기한 ${when(w.dueH)}`, actionCell(w, api, ui),
+    w.assetId, chip(CAUSE[w.cause], 'al-fault'), chip(w.status, STATUS_CLASS[w.status]), `발생 ${w.occurrences}번`, lossText(w), `기한 ${when(w.dueH)}`, actionCell(w, api, ui),
   ]);
 
   const proposalList = v.proposals.length
@@ -46,9 +47,9 @@ export function renderContractor(v, api, ui) {
       stat('열린 알람', String(v.alarms.length)), stat('본사로 올라간 것', String(hqCount), hqCount ? 'warn' : ''),
       stat('보고 기한 임박 · 지남', String(due), due ? 'warn' : ''), stat(`${v.billMonth} 청구 예정`, won(billed))),
     card('알람 — 안전 먼저, 그다음 손실 큰 순',
-      h('p', { class: 'muted small' }, "'확인'은 종결이 아닙니다. 조치 결과를 넣고 다음 날 해 뜬 시간에 정상으로 돌아와야 종결됩니다."),
+      h('p', { class: 'muted small' }, "'확인'은 종결이 아닙니다. 조치 결과를 넣고, 그 뒤 첫 해 뜬 시간에 정상으로 돌아와야 종결됩니다(낮에 넣으면 다음 날 아침, 새벽에 넣으면 그날 아침)."),
       table(['#', '설비', '원인', '상태', '손실(누적)', '하루 손실', '처음 감지', '비고', '조치 내용', ''], alarmRows),
-      h('p', { class: 'muted small' }, "손실이 작으면 '보류'로 다음 정기 방문 때 함께 갈 수 있습니다. 14일이 지나거나 보류 뒤 손실이 3만 원을 넘으면 본사로 올라갑니다. 안전 알람은 보류할 수 없습니다."),
+      h('p', { class: 'muted small' }, `손실이 작으면 '보류'로 다음 정기 방문 때 함께 갈 수 있습니다. ${days(v.rules.holdMaxHours)}이 지나거나 보류 뒤 손실이 ${manwon(v.rules.holdLossLimitWon)}을 넘으면 본사로 올라갑니다. 안전 알람은 보류할 수 없습니다.`),
       ui.resultFor ? resultForm(ui.resultFor, api) : null),
     card('작업 지시 — 같은 원인 7일 안 3번이면 하나로 묶음', table(['설비', '원인', '상태', '발생', '손실', '기한', ''], woRows)),
     card('출동 묶음 · 지도', h('div', { class: 'two' }, h('div', null, proposalList), siteMap(v.map, sel?.stops))),

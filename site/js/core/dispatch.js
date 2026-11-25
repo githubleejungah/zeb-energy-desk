@@ -1,4 +1,5 @@
-// 출동 묶음 제안(AC-19): 같은 구역의 열린 알람 · 작업 지시를 안전 먼저, 손실 큰 순으로 최대 N곳.
+// 출동 묶음 제안(AC-19): 같은 구역의 열린 알람 · 작업 지시를 알람 목록과 같은 순서(AC-78)로 최대 N곳.
+import { alarmOrder } from './alarms.js';
 const READY = ['열림', '본사대기'];
 
 export function proposals(seed, alarmResult, owner) {
@@ -7,7 +8,6 @@ export function proposals(seed, alarmResult, owner) {
     ...alarmResult.alarms.filter((a) => a.owner === owner && READY.includes(a.status)),
     ...alarmResult.workOrders.filter((w) => w.owner === owner && READY.includes(w.status)),
   ];
-  const rank = (a) => (a.cause === 'safety' ? 1e12 : a.lossWon);
   const byZone = new Map();
   for (const it of items) {
     if (!byZone.has(it.zone)) byZone.set(it.zone, []);
@@ -15,7 +15,7 @@ export function proposals(seed, alarmResult, owner) {
   }
   const out = [];
   for (const [zone, list] of [...byZone.entries()].sort()) {
-    list.sort((a, b) => rank(b) - rank(a));
+    list.sort(alarmOrder);
     for (let i = 0; i < list.length; i += max) {
       const chunk = list.slice(i, i + max);
       out.push({
@@ -23,7 +23,7 @@ export function proposals(seed, alarmResult, owner) {
         zone,
         keys: [...new Set(chunk.map((c) => c.key))],
         stops: chunk.map((c) => ({ key: c.key, assetId: c.assetId, x: c.x, y: c.y, cause: c.cause, lossWon: c.lossWon })),
-        lossWon: chunk.reduce((s, c) => s + c.lossWon, 0),
+        lossWon: chunk.reduce((s, c) => s + (c.lossWon ?? 0), 0),
       });
     }
   }

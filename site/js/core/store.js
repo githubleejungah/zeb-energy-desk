@@ -21,19 +21,20 @@ export function defaultState(seed) {
     holds: [],
     siteChecks: [],
     ownerOverrides: {},
+    optIns: {},
   };
 }
 
 // 같은 형식 버전 안에서 나중에 더한 칸은 빈 값으로 채운다(어제 저장한 시연도 그대로 열리게).
 export function normalize(x) {
   if (!x || typeof x !== 'object') return x;
-  return { holds: [], siteChecks: [], ownerOverrides: {}, ...x };
+  return { holds: [], siteChecks: [], ownerOverrides: {}, optIns: {}, ...x };
 }
 
 export function isValidState(x) {
   if (!x || typeof x !== 'object' || x.version !== VERSION || typeof x.clockH !== 'number') return false;
   for (const k of ['dispatches', 'results', 'reports', 'budgets', 'appeals', 'holds', 'siteChecks']) if (!Array.isArray(x[k])) return false;
-  for (const k of ['exceptionDecisions', 'settlements', 'missionLog', 'seen', 'ownerOverrides']) if (!x[k] || typeof x[k] !== 'object' || Array.isArray(x[k])) return false;
+  for (const k of ['exceptionDecisions', 'settlements', 'missionLog', 'seen', 'ownerOverrides', 'optIns']) if (!x[k] || typeof x[k] !== 'object' || Array.isArray(x[k])) return false;
   return true;
 }
 

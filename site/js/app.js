@@ -47,6 +47,7 @@ const api = {
     const r = act.fileAppeal(state, m, householdId);
     commit({ state: r.state });
   },
+  setOptIn: (on) => commit({ state: act.setOptIn(state, { householdId, on }) }),
   decideAppeal: (missionDay, hid, decision) => commit(act.decideAppeal(state, audit, { missionDay, householdId: hid, decision })),
   closeMonth: (month, shownTotalWon, lockReasons) => {
     const r = act.closeMonth(seed, state, audit, { month, shownTotalWon, lockReasons });

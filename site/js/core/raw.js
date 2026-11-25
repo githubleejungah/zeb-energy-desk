@@ -15,6 +15,24 @@ const shape = (hour) => (hour < 6 ? 0.4 : hour < 9 ? 1.1 : hour < 17 ? 0.7 : hou
 
 export const householdIds = (n) => Array.from({ length: n }, (_, i) => `H-${String(i + 1).padStart(4, '0')}`);
 
+export class BaselineExpiredError extends Error {
+  constructor(day) {
+    super(`기준선용 1시간 합계 보관 기간 지남: day ${day}`);
+    this.day = day;
+  }
+}
+
+// 기준선용 1시간 합계(AC-75). 15분 원본 삭제와 무관하게 읽히지만, 판정 시각(asOfH) 앞 보관 기간보다 오래된 날은 거부한다.
+// 시연에서는 저장하지 않고 같은 씨앗값으로 만들어 낸다(15분 원본과 같은 값의 1시간 합계).
+export function baselineHourly(seed, hid, day, asOfH) {
+  if (asOfH - (day + 1) * 24 > seed.config.baselineHourlyRetentionDays * 24) throw new BaselineExpiredError(day);
+  const q = householdUsage(seed, hid, day);
+  return Array.from({ length: 24 }, (_, h) => {
+    const part = q.slice(h * 4, h * 4 + 4);
+    return part.some((v) => v === null) ? null : part.reduce((s, v) => s + v, 0);
+  });
+}
+
 // 미션에 반응하는 세대(가상): 약 4가구 중 1가구
 export const isResponsive = (hid) => rand('resp', hid) < 0.25;
 

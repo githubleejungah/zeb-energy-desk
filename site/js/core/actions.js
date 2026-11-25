@@ -2,8 +2,10 @@
 // 돈 · 의무와 관련된 행동은 감사 기록에 남긴다(AC-34).
 import { append } from './audit.js';
 import * as settlement from './settlement.js';
+import { config } from '../data/seed.js';
+import { manwon, days } from './labels.js';
 
-const MAX_MEMO = 500; // SEC-04
+const MAX_MEMO = config.memoMaxChars; // SEC-04
 
 export function cleanMemo(text) {
   // 글자로만 다룬다(화면은 textContent). 길이 제한, 제어 문자 제거.
@@ -20,15 +22,15 @@ export function markSeen(state, key) {
 }
 
 export function confirmDispatch(state, audit, { keys, by, role }) {
-  const d = { id: `DS-${state.dispatches.length + 1}`, contractorId: by, by, alarmKeys: [...keys], proposedH: state.clockH, confirmedH: state.clockH };
-  const au = role === 'hq' ? append(audit, { at: state.clockH, role, action: 'assign.change', target: `${keys[0]}:${by}`, rule: '본사 담당 지정 · 출동 확정' }) : audit;
+  const d = { id: `DS-${state.dispatches.length + 1}`, contractorId: by, by, byRole: role === 'hq' ? 'hq' : 'contractor', alarmKeys: [...keys], proposedH: state.clockH, confirmedH: state.clockH };
+  const au = role === 'hq' ? append(audit, { at: state.clockH, role, action: 'assign.change', target: `${keys[0]}:${by}`, rule: 'AC-71 본사 담당 지정 · 출동 확정' }) : audit;
   return { state: { ...state, dispatches: [...state.dispatches, d] }, audit: au };
 }
 
 // 보류(다음 정기 방문, AC-64). 안전 알람은 규칙에서 무시된다.
 export function holdAlarm(state, audit, { key, by }) {
   const st = { ...state, holds: [...(state.holds ?? []), { alarmKey: key, atH: state.clockH, by }] };
-  return { state: st, audit: append(audit, { at: state.clockH, role: 'contractor', action: 'alarm.hold', target: key, rule: 'AC-64 보류 · 끝 조건 14일 또는 3만 원' }) };
+  return { state: st, audit: append(audit, { at: state.clockH, role: 'contractor', action: 'alarm.hold', target: key, rule: `AC-64 보류 · 끝 조건 ${days(config.holdMaxHours)} 또는 ${manwon(config.holdLossLimitWon)}` }) };
 }
 
 // 관리주체 현장 1차 확인(AC-60~62). result: 'solved' | 'failed'
@@ -49,8 +51,9 @@ export function submitReport(state, audit, { assetId, year, role = 'contractor' 
 
 export function decideException(state, audit, { id, decision }) {
   let st = { ...state, exceptionDecisions: { ...state.exceptionDecisions, [id]: { decision, decidedH: state.clockH } } };
-  // 이관 결정 '공공 기관 배정' → 담당을 가상 공공 사후관리 기관으로(AC-67)
-  if (id.startsWith('HT-') && decision === '공공 기관 배정') st = { ...st, ownerOverrides: { ...(st.ownerOverrides ?? {}), [id.slice(3)]: { to: 'PUB', atH: state.clockH } } };
+  // 이관 결정(AC-67): 공공 기관 배정 → PUB(AC-74), 소유주 책임 안내 · 철거 안내 → END 관리 종료(AC-73)
+  const to = decision === '공공 기관 배정' ? 'PUB' : ['소유주 책임 안내', '철거 안내'].includes(decision) ? 'END' : null;
+  if (id.startsWith('HT-') && to) st = { ...st, ownerOverrides: { ...(st.ownerOverrides ?? {}), [id.slice(3)]: { to, atH: state.clockH } } };
   return { state: st, audit: append(audit, { at: state.clockH, role: 'hq', action: 'exception.decide', target: id, rule: `판정 ${decision === 'company' ? '회사 책임' : decision === 'field' ? '현장 원인' : '처리'}` }) };
 }
 
@@ -61,9 +64,15 @@ export function approveBudget(state, audit, { partnerId, won }) {
   return { state: st, audit: append(audit, { at: state.clockH, role: 'complex', action: 'budget.approve', target: `${partnerId}:${amount}`, rule: 'AC-44 관리주체 승인' }) };
 }
 
+// 미션 참여 신청 · 취소(AC-76). 기본값과 다른 것만 남긴다. 다음 미션부터 적용.
+export function setOptIn(state, { householdId, on }) {
+  return { ...state, optIns: { ...(state.optIns ?? {}), [householdId]: { on: Boolean(on), atH: state.clockH } } };
+}
+
 // 이의 제기(AC-40): 결과 공개 뒤 7일 안, 미션마다 1번.
 export function fileAppeal(state, mission, householdId) {
   if (!mission || mission.status !== 'judged') return { state, ok: false, reason: '판정된 미션이 아닙니다' };
+  if (!mission.results?.[householdId]) return { state, ok: false, reason: '참여 신청 전 미션입니다' };
   if (state.clockH > mission.appealDueH) return { state, ok: false, reason: '이의 기한(7일)이 지났습니다' };
   if (state.appeals.some((a) => a.missionDay === mission.day && a.householdId === householdId)) return { state, ok: false, reason: '이미 이의를 냈습니다' };
   return { state: { ...state, appeals: [...state.appeals, { missionDay: mission.day, householdId, filedH: state.clockH, decision: null, decidedH: null }] }, ok: true };

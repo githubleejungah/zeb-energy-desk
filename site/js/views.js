@@ -1,13 +1,13 @@
 // 역할 × 칸 노출표(docs/data-model.md 3절). 화면에 넘기기 전에 여기서 거른다(AC-02 · ADR 0003).
 // 원칙: 허용한 칸만 골라 새 객체를 만든다(빼는 방식이 아니라 고르는 방식).
-import { householdHourly } from './core/settlement.js';
+import { householdHourly, joined } from './core/settlement.js';
 import { dayOf, hourOf } from './core/time.js';
 
 export const ROLES = ['contractor', 'resident', 'complex', 'hq'];
 
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]));
-const ALARM_KEYS = ['id', 'key', 'assetId', 'kind', 'zone', 'cause', 'via', 'status', 'lossWon', 'estimated', 'firstH', 'openedH', 'escalateReason', 'reopenCount', 'resultMemo', 'checkH', 'x', 'y', 'note', 'capacityKw', 'dayLossWon', 'holdH', 'holdLossWon', 'siteCheck', 'common'];
-const WO_KEYS = ['id', 'key', 'assetId', 'kind', 'zone', 'cause', 'status', 'lossWon', 'openedH', 'dueH', 'occurrences', 'escalateReason', 'x', 'y'];
+const ALARM_KEYS = ['id', 'key', 'assetId', 'kind', 'zone', 'cause', 'via', 'status', 'lossWon', 'estimated', 'firstH', 'openedH', 'escalateReason', 'reopenCount', 'resultMemo', 'checkH', 'x', 'y', 'note', 'capacityKw', 'dayLossWon', 'holdH', 'holdLossWon', 'siteCheck', 'common', 'assignee', 'impactHours'];
+const WO_KEYS = ['id', 'key', 'assetId', 'kind', 'zone', 'cause', 'status', 'lossWon', 'openedH', 'dueH', 'occurrences', 'escalateReason', 'x', 'y', 'assignee', 'impactHours'];
 
 function assetStatus(snap, assetId) {
   const a = snap.alarms.find((x) => x.assetId === assetId) ?? snap.workOrders.find((x) => x.assetId === assetId);
@@ -18,7 +18,7 @@ function assetStatus(snap, assetId) {
 }
 
 function contractorView(seed, snap, contractorId) {
-  const mine = (x) => snap.owners[x.assetId] === contractorId;
+  const mine = (x) => snap.owners[x.assetId] === contractorId || x.assignee === contractorId; // AC-71 본사가 지정한 것도
   const myAssets = seed.assets.filter((a) => snap.owners[a.id] === contractorId);
   const c = seed.contractors.find((x) => x.id === contractorId);
   return {
@@ -34,6 +34,7 @@ function contractorView(seed, snap, contractorId) {
       .map((l) => pick(l, ['assetId', 'plan', 'days', 'monthDays', 'feeWon', 'creditRate', 'creditWon', 'billedWon'])),
     billMonth: snap.settlementPreview.month,
     sources: seed.obligationSources,
+    rules: { holdMaxHours: seed.config.holdMaxHours, holdLossLimitWon: seed.config.holdLossLimitWon },
   };
 }
 
@@ -50,6 +51,7 @@ function residentView(seed, snap, householdId) {
     const base = { day: m.day, hour: m.hour, status: m.status };
     if (m.status !== 'judged') return base;
     const r = m.results[householdId];
+    if (!r) return { ...base, verdict: 'not_joined', points: 0 }; // AC-76 신청 전 미션
     const ap = snap.pendingAppeals.concat([]).find((a) => a.missionDay === m.day && a.householdId === householdId);
     return { ...base, verdict: r.verdict, points: r.points, ratioPct: r.ratioPct, blanks: r.blanks, overturned: Boolean(r.overturned), appealDueH: m.appealDueH, appealPending: Boolean(ap) };
   });
@@ -62,6 +64,7 @@ function residentView(seed, snap, householdId) {
     pointsTotal: myMissions.reduce((s, m) => s + (m.points ?? 0), 0),
     rules: { baselineDays: cfg.missionBaselineDays, lookbackDays: cfg.missionBaselineLookbackDays, successPct: Math.round(cfg.missionSuccessRatio * 100), points: cfg.missionPoints, appealDays: cfg.appealHours / 24, blanksRule: '미션 1시간의 15분 검침 4칸 중 1칸이라도 비면 판정 불가' },
     budgetExhausted: snap.missions.remainingWon < snap.missions.maxPerMissionWon,
+    joined: joined(seed, { optIns: snap.optIns }, householdId, snap.now), // AC-76
   };
 }
 
@@ -78,8 +81,8 @@ function complexView(seed, snap) {
     safetyAlarms: snap.alarms.filter((a) => a.cause === 'safety' && common.some((c) => c.id === a.assetId)).map((a) => pick(a, ['assetId', 'status', 'firstH'])), // AC-11
     // 공용 설비 알람과 현장 1차 확인(AC-60~63). 안전 알람은 체크리스트 0개.
     commonAlarms: snap.alarms.filter((a) => common.some((c) => c.id === a.assetId)).map((a) => ({
-      ...pick(a, ['key', 'assetId', 'cause', 'status', 'firstH', 'dayLossWon', 'siteCheck']),
-      checklist: a.cause === 'safety' ? [] : seed.config.siteCheckItems,
+      ...pick(a, ['key', 'assetId', 'kind', 'cause', 'status', 'firstH', 'dayLossWon', 'impactHours', 'siteCheck']),
+      checklist: a.cause === 'safety' ? [] : seed.config.siteCheckItems[a.kind === 'pv' ? 'pv' : 'other'], // AC-60 설비 종류별
       expertOnly: a.cause === 'safety',
     })),
     budget: pick(snap.missions, ['approvedWon', 'spentWon', 'remainingWon', 'maxPerMissionWon']),
@@ -101,7 +104,7 @@ function hqView(seed, snap, audit) {
     role: 'hq', now: snap.now,
     alarms: snap.alarms.map((a) => ({ ...pick(a, ALARM_KEYS), owner: snap.owners[a.assetId] })),
     workOrders: snap.workOrders.map((w) => ({ ...pick(w, WO_KEYS), owner: snap.owners[w.assetId] })),
-    queue: [...snap.alarms, ...snap.workOrders].filter((x) => x.status === '본사대기').map((x) => ({ ...pick(x, ['id', 'key', 'assetId', 'cause', 'status', 'escalateReason', 'lossWon']), owner: snap.owners[x.assetId] })),
+    queue: [...snap.alarms, ...snap.workOrders].filter((x) => x.status === '본사대기').map((x) => ({ ...pick(x, ['id', 'key', 'assetId', 'cause', 'status', 'escalateReason', 'lossWon', 'impactHours']), owner: snap.owners[x.assetId] })),
     exceptions: snap.exceptions.map((e) => pick(e, ['id', 'type', 'refId', 'note', 'options', 'decision', 'decidedH', 'openedH'])),
     settlement: {
       month: p.month, lines: Object.values(byContractor), detail: p.lines.map((l) => pick(l, ['contractorId', 'assetId', 'days', 'feeWon', 'outageH', 'creditRate', 'creditWon', 'billedWon'])),
@@ -119,6 +122,7 @@ function hqView(seed, snap, audit) {
     partnerReport: pick(snap.partnerReport, ['participantHouseholds', 'successCount', 'paidWon', 'movedKwh', 'remainingWon']),
     proposals: snap.proposals.HQ ?? [],
     deletedMonths: snap.deletedMonths,
+    rawRetentionHours: seed.config.rawRetentionHours,
     audit: audit.map((e) => pick(e, ['seq', 'at', 'role', 'action', 'target', 'rule'])),
   };
 }

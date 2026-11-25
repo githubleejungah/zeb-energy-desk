@@ -66,7 +66,7 @@ export function missionHourOf(seed, day) {
   if (!m) { m = new Map(); mhCache.set(seed, m); }
   if (m.has(day)) return m.get(day);
   let found = null;
-  for (let h = 10; h < 15; h++) {
+  for (let h = seed.config.missionWindowStartHour; h < seed.config.missionWindowEndHour; h++) {
     if (complexGen(seed, day, h) > complexLoad(day, h)) { found = h; break; }
   }
   m.set(day, found);

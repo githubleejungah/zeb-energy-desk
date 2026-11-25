@@ -2,7 +2,7 @@
 import { s, h } from './dom.js';
 
 const COLOR = { safety: 'var(--alarm-safety)', fault: 'var(--alarm-fault)', estimated: 'var(--alarm-estimated)', normal: 'var(--alarm-normal)' };
-const LABEL = { safety: '안전', fault: '손실 큰 고장', estimated: '손실 추정(끊김)', normal: '정상' };
+const LABEL = { safety: '안전', fault: '고장', estimated: '손실 추정(끊김)', normal: '정상' };
 const OFFICE = { x: 30, y: 300 };
 
 export function siteMap(points, route) {
@@ -22,6 +22,7 @@ export function siteMap(points, route) {
     const pts = [OFFICE, ...route].map((p) => `${p.x},${p.y}`).join(' ');
     svg.append(s('polyline', { points: pts, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-dasharray': '6 4' }));
   }
+  const stopNo = new Map((route ?? []).map((p, i) => [`${p.x},${p.y}`, i + 1]));
   for (const p of points) {
     const c = COLOR[p.status];
     const common = { fill: p.status === 'estimated' ? 'none' : c, stroke: c, 'stroke-width': p.status === 'estimated' ? 2 : 1, 'stroke-dasharray': p.status === 'estimated' ? '3 2' : null };
@@ -31,10 +32,16 @@ export function siteMap(points, route) {
     shape.append(s('title', null, `${p.id} · ${LABEL[p.status]}`));
     svg.append(shape);
     if (p.id.startsWith('A-')) svg.append(s('text', { x: p.x + 25, y: p.y + 21, 'text-anchor': 'middle', class: 'map-t' }, p.id.slice(2)));
+    const no = stopNo.get(`${p.x},${p.y}`);
+    if (no) {
+      const cx = p.id.startsWith('A-') ? p.x + 50 : p.x + 9, cy = p.id.startsWith('A-') ? p.y : p.y - 9;
+      svg.append(s('circle', { cx, cy, r: 8, fill: 'var(--accent)' }));
+      svg.append(s('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', class: 'map-no' }, String(no)));
+    }
   }
   const legend = h('div', { class: 'legend' },
     Object.entries(LABEL).map(([k, v]) => h('span', { class: `lg lg-${k}` }, v)),
-    h('span', { class: 'lg lg-route' }, '출동 묶음 경로'),
+    h('span', { class: 'lg lg-route' }, '출동 묶음 경로(번호 = 들르는 순서, 선은 번호 붙은 곳만 이음)'),
   );
   return h('div', null, svg, legend, h('p', { class: 'muted small' }, '가상 동네 배치도 · 실제 지도 아님 · 외부 지도를 불러오지 않습니다.'));
 }
