@@ -1,5 +1,6 @@
 // 단지 화면(C): 건설사 · 관리주체 — 단지 합계 · 공용 설비 · 안전 알람 · 제휴 예산 · 제휴사 리포트
 import { h, s, card, table, chip, stat, button, won, when, CAUSE, STATUS_CLASS } from './dom.js';
+import { budgetLine } from '../core/warnings.js';
 
 const ST = { normal: ['정상', 'st-done'], fault: ['고장', 'al-fault'], estimated: ['통신 끊김', 'al-est'], safety: ['안전', 'al-safety'] };
 
@@ -17,7 +18,7 @@ function genLoad(hourly) {
   return h('div', null, svg, h('div', { class: 'legend' }, h('span', { class: 'lg lg-brand' }, '태양광 발전'), h('span', { class: 'lg lg-muted' }, '공용 사용')));
 }
 
-export function renderComplex(v, api) {
+export function renderComplex(v, api, ui = {}) {
   const amount = h('input', { type: 'number', min: 0, step: 10000, value: 100000, 'aria-label': '승인 금액(원)' });
   const r = v.partnerReport;
   return h('div', { class: 'grid' },
@@ -34,7 +35,10 @@ export function renderComplex(v, api) {
     card(`제휴 리워드 예산 — ${v.partners.map((p) => p.name).join(', ')}`,
       table(['승인 합계', '지급', '남은 예산', '1회 최대 지급'], [[won(v.budget.approvedWon), won(v.budget.spentWon), won(v.budget.remainingWon), won(v.budget.maxPerMissionWon)]]),
       v.budget.remainingWon < v.budget.maxPerMissionWon ? h('p', { class: 'warnbox' }, '남은 예산이 1회 최대 지급액보다 적어 새 미션이 열리지 않습니다.') : null,
-      h('div', { class: 'form' }, h('span', null, '추가 예산 승인'), amount, button('승인', () => api.approveBudget(v.partners[0].id, amount.value)))),
+      ui.budgetAsk
+        ? h('div', { class: 'warnbox' }, h('p', null, `승인 전 확인 — ${budgetLine(ui.budgetAsk, v.budget.maxPerMissionWon)}`), // AC-88
+          h('span', { class: 'acts' }, button('승인 확정', () => { api.ui({ budgetAsk: null }); api.approveBudget(v.partners[0].id, ui.budgetAsk); }), button('취소', () => api.ui({ budgetAsk: null }), { class: 'btn ghost' })))
+        : h('div', { class: 'form' }, h('span', null, '추가 예산 승인'), amount, button('승인', () => { const n = Math.max(0, Math.floor(Number(amount.value) || 0)); if (n) api.ui({ budgetAsk: n }); }))),
     card('제휴사 리포트 — 합계 5가지만(세대별 내역 없음)', table(['참여 세대 수', '성공 건수', '지급 총액', '옮긴 전력량', '남은 예산'],
       [[`${r.participantHouseholds}세대`, `${r.successCount}건`, won(r.paidWon), `${r.movedKwh}kWh`, won(r.remainingWon)]])),
   );

@@ -1,6 +1,7 @@
 // 역할 × 칸 노출표(docs/data-model.md 3절). 화면에 넘기기 전에 여기서 거른다(AC-02 · ADR 0003).
 // 원칙: 허용한 칸만 골라 새 객체를 만든다(빼는 방식이 아니라 고르는 방식).
 import { householdHourly, joined } from './core/settlement.js';
+import { hqTakeLine } from './core/warnings.js';
 import { dayOf, hourOf } from './core/time.js';
 
 export const ROLES = ['contractor', 'resident', 'complex', 'hq'];
@@ -105,7 +106,7 @@ function hqView(seed, snap, audit) {
     alarms: snap.alarms.map((a) => ({ ...pick(a, ALARM_KEYS), owner: snap.owners[a.assetId] })),
     workOrders: snap.workOrders.map((w) => ({ ...pick(w, WO_KEYS), owner: snap.owners[w.assetId] })),
     queue: [...snap.alarms, ...snap.workOrders].filter((x) => x.status === '본사대기').map((x) => ({ ...pick(x, ['id', 'key', 'assetId', 'cause', 'status', 'escalateReason', 'lossWon', 'impactHours']), owner: snap.owners[x.assetId] })),
-    exceptions: snap.exceptions.map((e) => pick(e, ['id', 'type', 'refId', 'note', 'options', 'decision', 'decidedH', 'openedH'])),
+    exceptions: snap.exceptions.map((e) => ({ ...pick(e, ['id', 'type', 'refId', 'note', 'options', 'decision', 'decidedH', 'openedH']), draft: e.decision ? null : snap.exceptionDrafts[e.id] ?? null, warn: snap.warn.exceptions[e.id] ?? null })), // AC-80~85
     settlement: {
       month: p.month, lines: Object.values(byContractor), detail: p.lines.map((l) => pick(l, ['contractorId', 'assetId', 'days', 'feeWon', 'outageH', 'creditRate', 'creditWon', 'billedWon'])),
       totalFeeWon: p.totalFeeWon, totalCreditWon: p.totalCreditWon, totalBilledWon: p.totalBilledWon,
@@ -115,12 +116,15 @@ function hqView(seed, snap, audit) {
     appeals: snap.pendingAppeals.map((a) => {
       const m = snap.missions.list.find((x) => x.day === a.missionDay);
       const r = m?.results?.[a.householdId] ?? {};
-      return { missionDay: a.missionDay, householdId: a.householdId, filedH: a.filedH, verdict: r.verdict ?? null, ratioPct: r.ratioPct ?? null, blanks: r.blanks ?? null };
+      const k = `${a.missionDay}|${a.householdId}`;
+      return { missionDay: a.missionDay, householdId: a.householdId, filedH: a.filedH, verdict: r.verdict ?? null, ratioPct: r.ratioPct ?? null, blanks: r.blanks ?? null, draft: snap.appealDrafts[k] ?? null, warn: snap.warn.appeals[k] ?? null };
     }),
     missions: snap.missions.list.map(missionRow),
     budget: pick(snap.missions, ['approvedWon', 'spentWon', 'remainingWon', 'maxPerMissionWon']),
     partnerReport: pick(snap.partnerReport, ['participantHouseholds', 'successCount', 'paidWon', 'movedKwh', 'remainingWon']),
     proposals: snap.proposals.HQ ?? [],
+    hqTakeLine: hqTakeLine(seed, snap.alarms.map((a) => ({ owner: snap.owners[a.assetId], assignee: a.assignee }))), // AC-87
+    closeCompare: snap.warn.closeCompare, // AC-89
     deletedMonths: snap.deletedMonths,
     rawRetentionHours: seed.config.rawRetentionHours,
     audit: audit.map((e) => pick(e, ['seq', 'at', 'role', 'action', 'target', 'rule'])),

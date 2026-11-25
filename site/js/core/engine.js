@@ -8,6 +8,7 @@ import { preview, missions, partnerReport, deletedMonths, rawDeletionCount } fro
 import { complexGen, complexLoad } from './telemetry.js';
 import { append, hasKey } from './audit.js';
 import { days } from './labels.js';
+import { exceptionImpact, appealImpact, hqTakeLine, closeCompare } from './warnings.js';
 import { dayOf, hourOf, monthOfDay, monthRange, fromDateStr } from './time.js';
 
 export function closeMonthOf(now) {
@@ -29,6 +30,19 @@ export function snapshot(seed, state) {
   const day = dayOf(now);
   const hoursToday = hourOf(now);
   const complexHourly = Array.from({ length: hoursToday }, (_, h) => ({ hour: h, genKwh: complexGen(seed, day, h), loadKwh: complexLoad(day, h) }));
+  // 사전 경고(AC-84 · AC-85 · AC-87 · AC-89): 초안의 영향, 본사 직접, 마감 비교
+  const previewOf = (st, month) => preview(seed, st, month);
+  const exDrafts = state.exceptionDrafts ?? {};
+  const apDrafts = state.appealDrafts ?? {};
+  const warn = {
+    exceptions: Object.fromEntries(exc.filter((e) => exDrafts[e.id] && !e.decision).map((e) => [e.id, exceptionImpact(seed, state, e, exDrafts[e.id].decision, ar.alarms, previewOf)])),
+    appeals: Object.fromEntries(pendingAppeals.filter((a) => apDrafts[`${a.missionDay}|${a.householdId}`]).map((a) => {
+      const k = `${a.missionDay}|${a.householdId}`;
+      const m = ms.list.find((x) => x.day === a.missionDay);
+      return [k, appealImpact(seed, m?.results?.[a.householdId], apDrafts[k].decision, ms.remainingWon)];
+    })),
+    closeCompare: closeCompare(state, closeMonth, preview(seed, state, closeMonth)),
+  };
   const owners = Object.fromEntries(seed.assets.map((a) => [a.id, ownerAt(seed, a, now, state.ownerOverrides ?? {})]));
   const proposalsBy = Object.fromEntries([...seed.contractors.map((c) => c.id), 'HQ'].map((id) => [id, proposals(seed, ar, id)]));
   return {
@@ -37,7 +51,7 @@ export function snapshot(seed, state) {
     proposals: proposalsBy, obligations: obl, exceptions: exc,
     missions: ms, partnerReport: partnerReport(ms), pendingAppeals,
     closeMonth, settlementPreview: preview(seed, state, closeMonth), settlementClosed: state.settlements[closeMonth] ?? null,
-    lockReasons, complexHourly,
+    lockReasons, complexHourly, warn, exceptionDrafts: exDrafts, appealDrafts: apDrafts,
   };
 }
 

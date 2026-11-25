@@ -18,7 +18,8 @@
 | 기준선용 1시간 합계 | `raw.js`의 생성 함수(**저장 안 함**, 판정 시각 앞 30일만 읽기 허용) | 없음(생성 전용), 읽기는 정산 모듈만 | 없음 |
 | 알람 · 작업 지시 | 저장 안 함. 설비 계측 + 사람 행동으로 매번 계산(ADR 0006) | 규칙(alarms.js) | 시공사 · 본사 화면, 관리주체(안전 알람만) |
 | 의무 기록(보고서 초안 · 제출 기록) | `zed:v1:state` 의 `reports` | 시공사 | 시공사 · 본사 화면 |
-| 예외 | 저장 안 함. 기준 데이터 · 알람 · 정산으로 매번 계산. 본사 판정만 `zed:v1:state` 의 `exceptionDecisions` | 본사(판정) | 본사 화면 |
+| 예외 | 저장 안 함. 기준 데이터 · 알람 · 정산으로 매번 계산. 확정 판정만 `zed:v1:state` 의 `exceptionDecisions` | 본사(판정) | 본사 화면 |
+| 판정 초안(예외 · 재심) | `zed:v1:state` 의 `exceptionDrafts` · `appealDrafts`(고른 판정 · 고른 횟수). 감사 기록 0줄, 계산 반영 0건 | 본사(고르기 · 확정) | 본사 화면(영향 미리보기 · 사전 경고, AC-80~85) |
 | 월 정산 결과 | `zed:v1:state` 의 `settlements` | 본사(마감) | 본사 화면, 시공사(자기 청구액만) |
 | 미션 판정 기록 | `zed:v1:state` 의 `missionLog`(날짜별: 세대 가명 → 판정 · 포인트 · 기준선 대비 % · 빈 칸 수. 사용량 값 없음) | 정산 모듈(처음 판정 때 한 번 기록, 다시 계산 안 함) | 입주민(자기 것만), 관리주체 · 제휴사 리포트(합계만), 본사(재심 대상만) |
 | 이의 · 재심 | `zed:v1:state` 의 `appeals` | 입주민(제기) · 본사(판정) | 입주민(자기 것), 본사 |
@@ -60,7 +61,9 @@
   reports:    [{ assetId, year, submittedH }],
   budgets:    [{ partnerId, approvedWon, approvedH }],
   appeals:    [{ missionDay, householdId, filedH, decision, decidedH }],
-  exceptionDecisions: { "OC-SO-3": { decision: "company", decidedH } },
+  exceptionDecisions: { "OC-SO-3": { decision: "company", decidedH } },        // 확정된 판정만(AC-83)
+  exceptionDrafts:    { "OC-SO-3": { decision: "field", picks: 2, atH } },     // 초안: 다시 고를 수 있음, 계산 반영 0(AC-80~82)
+  appealDrafts:       { "20|H-0002": { decision: "overturn", picks: 1, atH } }, // 재심 초안(키 = 미션 날|가명)
   settlements: { "2026-08": { month, closedH, lines[], totalFeeWon, totalCreditWon, totalBilledWon } },
   missionLog:  { "20": { day, hour, publishedH, appealDueH, movedKwh, results: { "H-0002": { verdict, points, ratioPct, blanks } } } }
 }
@@ -77,7 +80,8 @@
 // 예: { seq: 12, at: "2026-09-01T10:00", role: "hq", action: "settlement.close", target: "2026-08", rule: "AC-32 잠금 0건" }
 ```
 
-- 행동 종류: 정산 마감 · 감면 확정 · 예외 판정 · 보고서 제출 · 담당 변경 · 예산 승인 · 원본 삭제 · 시연 초기화(AC-34 · AC-47 · AC-53).
+- 행동 종류: 정산 마감 · 감면 확정 · 예외 판정 · 재심 판정 · 보고서 제출 · 담당 변경 · 예산 승인 · 보류 · 자동 회복 · 원본 삭제 · 시연 초기화(AC-34 · AC-47 · AC-53 · AC-79).
+- 예외 · 재심 판정은 **확정할 때만** 1줄을 남기고 `rule`에 '초안 n번 고름'을 적는다. 초안을 고르는 동안은 0줄(AC-80 · AC-83).
 - `target`에는 ID만 넣는다. 사용량 값 · 이름 · 연락처는 넣지 않는다(AC-35).
 - `audit.js`에는 덧붙이는 함수만 있다. 고치기 · 지우기 함수는 0개(AC-34). 단 브라우저 저장소 값은 사용자가 직접 지울 수 있다(시연 한계, architecture R-2).
 

@@ -2,7 +2,9 @@
 // 돈 · 의무와 관련된 행동은 감사 기록에 남긴다(AC-34).
 import { append } from './audit.js';
 import * as settlement from './settlement.js';
-import { config } from '../data/seed.js';
+import * as seedData from '../data/seed.js';
+import { assignCheck } from './warnings.js';
+const { config } = seedData;
 import { manwon, days } from './labels.js';
 
 const MAX_MEMO = config.memoMaxChars; // SEC-04
@@ -22,6 +24,7 @@ export function markSeen(state, key) {
 }
 
 export function confirmDispatch(state, audit, { keys, by, role }) {
+  if (role === 'hq') { const ck = assignCheck(seedData, by, state.clockH); if (!ck.ok) return { state, audit, blocked: ck.reason }; } // AC-86
   const d = { id: `DS-${state.dispatches.length + 1}`, contractorId: by, by, byRole: role === 'hq' ? 'hq' : 'contractor', alarmKeys: [...keys], proposedH: state.clockH, confirmedH: state.clockH };
   const au = role === 'hq' ? append(audit, { at: state.clockH, role, action: 'assign.change', target: `${keys[0]}:${by}`, rule: 'AC-71 본사 담당 지정 · 출동 확정' }) : audit;
   return { state: { ...state, dispatches: [...state.dispatches, d] }, audit: au };
@@ -49,12 +52,26 @@ export function submitReport(state, audit, { assetId, year, role = 'contractor' 
   return { state: st, audit: append(audit, { at: state.clockH, role, action: 'report.submit', target: `${assetId}:Y${year}`, rule: 'AC-23 시공사 제출' }) };
 }
 
-export function decideException(state, audit, { id, decision }) {
+// 예외 판정 초안(AC-80~82): 다시 고를 수 있고, 감사 기록 0줄 · 계산 반영 0건
+export function pickException(state, { id, decision }) {
+  const prev = state.exceptionDrafts?.[id];
+  return { ...state, exceptionDrafts: { ...(state.exceptionDrafts ?? {}), [id]: { decision, picks: (prev?.picks ?? 0) + 1, atH: state.clockH } } };
+}
+
+// 초안 확정(AC-83): 판정 반영 + 감사 기록 1줄(최종 판정 · 초안 고른 횟수)
+export function confirmException(state, audit, { id }) {
+  const d = state.exceptionDrafts?.[id];
+  if (!d) return { state, audit };
+  const { [id]: _, ...rest } = state.exceptionDrafts;
+  return decideException({ ...state, exceptionDrafts: rest }, audit, { id, decision: d.decision, picks: d.picks });
+}
+
+export function decideException(state, audit, { id, decision, picks = null }) {
   let st = { ...state, exceptionDecisions: { ...state.exceptionDecisions, [id]: { decision, decidedH: state.clockH } } };
   // 이관 결정(AC-67): 공공 기관 배정 → PUB(AC-74), 소유주 책임 안내 · 철거 안내 → END 관리 종료(AC-73)
   const to = decision === '공공 기관 배정' ? 'PUB' : ['소유주 책임 안내', '철거 안내'].includes(decision) ? 'END' : null;
   if (id.startsWith('HT-') && to) st = { ...st, ownerOverrides: { ...(st.ownerOverrides ?? {}), [id.slice(3)]: { to, atH: state.clockH } } };
-  return { state: st, audit: append(audit, { at: state.clockH, role: 'hq', action: 'exception.decide', target: id, rule: `판정 ${decision === 'company' ? '회사 책임' : decision === 'field' ? '현장 원인' : '처리'}` }) };
+  return { state: st, audit: append(audit, { at: state.clockH, role: 'hq', action: 'exception.decide', target: id, rule: `판정 ${decision === 'company' ? '회사 책임' : decision === 'field' ? '현장 원인' : decision}${picks ? ` · 초안 ${picks}번 고름` : ''}` }) };
 }
 
 export function approveBudget(state, audit, { partnerId, won }) {
@@ -78,10 +95,26 @@ export function fileAppeal(state, mission, householdId) {
   return { state: { ...state, appeals: [...state.appeals, { missionDay: mission.day, householdId, filedH: state.clockH, decision: null, decidedH: null }] }, ok: true };
 }
 
-export function decideAppeal(state, audit, { missionDay, householdId, decision }) {
+// 재심 판정 초안 · 확정(AC-80~83). 키 = 미션 날|가명
+const appealKey = (day, hid) => `${day}|${hid}`;
+export function pickAppeal(state, { missionDay, householdId, decision }) {
+  const k = appealKey(missionDay, householdId);
+  const prev = state.appealDrafts?.[k];
+  return { ...state, appealDrafts: { ...(state.appealDrafts ?? {}), [k]: { decision, picks: (prev?.picks ?? 0) + 1, atH: state.clockH } } };
+}
+
+export function confirmAppeal(state, audit, { missionDay, householdId }) {
+  const k = appealKey(missionDay, householdId);
+  const d = state.appealDrafts?.[k];
+  if (!d) return { state, audit };
+  const { [k]: _, ...rest } = state.appealDrafts;
+  return decideAppeal({ ...state, appealDrafts: rest }, audit, { missionDay, householdId, decision: d.decision, picks: d.picks });
+}
+
+export function decideAppeal(state, audit, { missionDay, householdId, decision, picks = null }) {
   const appeals = state.appeals.map((a) => (a.missionDay === missionDay && a.householdId === householdId && !a.decision ? { ...a, decision, decidedH: state.clockH } : a));
   const st = { ...state, appeals };
-  return { state: st, audit: append(audit, { at: state.clockH, role: 'hq', action: 'appeal.decide', target: `${householdId}:D${missionDay}`, rule: decision === 'overturn' ? '재심: 성공으로 변경' : '재심: 판정 유지' }) };
+  return { state: st, audit: append(audit, { at: state.clockH, role: 'hq', action: 'appeal.decide', target: `${householdId}:D${missionDay}`, rule: (decision === 'overturn' ? '재심: 성공으로 변경' : '재심: 판정 유지') + (picks ? ` · 초안 ${picks}번 고름` : '') }) };
 }
 
 export function closeMonth(seed, state, audit, { month, shownTotalWon, lockReasons }) {

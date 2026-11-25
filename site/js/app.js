@@ -34,13 +34,14 @@ const api = {
   ui: (patch) => { ui = { ...ui, ...patch }; render(false); },
   markSeen: (key) => commit({ state: act.markSeen(state, key) }),
   confirmDispatch: (keys) => commit(act.confirmDispatch(state, audit, { keys, by: contractorId, role: 'contractor' })),
-  assign: (key, by) => commit(act.confirmDispatch(state, audit, { keys: [key], by, role: 'hq' })),
+  assign: (key, by) => { const r = act.confirmDispatch(state, audit, { keys: [key], by, role: 'hq' }); ui = { ...ui, assignMsg: r.blocked ?? null }; commit(r); },
   holdAlarm: (key) => commit(act.holdAlarm(state, audit, { key, by: contractorId })),
   siteCheck: (key, result, items) => commit({ state: act.siteCheck(state, { key, result, items }) }),
   enterResult: (key, memo) => { ui = { ...ui, resultFor: null }; commit({ state: act.enterResult(state, { key, memo }) }); },
   reportDraft: (assetId, year) => reportDraft(seed, assetId, year, snap, state.clockH),
   submitReport: (assetId, year) => { ui = { ...ui, draft: null }; commit(act.submitReport(state, audit, { assetId, year })); },
-  decideException: (id, decision) => commit(act.decideException(state, audit, { id, decision })),
+  pickException: (id, decision) => commit({ state: act.pickException(state, { id, decision }) }),
+  confirmException: (id) => commit(act.confirmException(state, audit, { id })),
   approveBudget: (partnerId, won) => commit(act.approveBudget(state, audit, { partnerId, won })),
   fileAppeal: (day) => {
     const m = snap.missions.list.find((x) => x.day === day);
@@ -48,7 +49,8 @@ const api = {
     commit({ state: r.state });
   },
   setOptIn: (on) => commit({ state: act.setOptIn(state, { householdId, on }) }),
-  decideAppeal: (missionDay, hid, decision) => commit(act.decideAppeal(state, audit, { missionDay, householdId: hid, decision })),
+  pickAppeal: (missionDay, hid, decision) => commit({ state: act.pickAppeal(state, { missionDay, householdId: hid, decision }) }),
+  confirmAppeal: (missionDay, hid) => commit(act.confirmAppeal(state, audit, { missionDay, householdId: hid })),
   closeMonth: (month, shownTotalWon, lockReasons) => {
     const r = act.closeMonth(seed, state, audit, { month, shownTotalWon, lockReasons });
     ui = { ...ui, closeMsg: r.result.ok ? '마감했습니다.' : r.result.reason === 'mismatch' ? `금액이 다시 계산한 값과 ${r.result.diffWon}원 다릅니다. 마감하지 않았습니다.` : '마감할 수 없습니다.' };

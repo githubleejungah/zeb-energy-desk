@@ -58,7 +58,8 @@ flowchart LR
 | `site/js/core/raw.js` | **세대** 15분 원본 생성(씨앗값, 같은 입력이면 같은 값) · 삭제된 달이면 오류. 기준선용 1시간 합계(판정 시각 앞 30일까지만). 정산 모듈만 불러 씀 | AC-46 · AC-47 · AC-75 |
 | `site/js/core/telemetry.js` | **설비** 계측(1시간: 발전 · 데이터 수신 · 살아 있음 신호 · 안전 신호), 회사 쪽 수집 중단, 단지 발전 · 공용 사용 합계, 미션 시간 | AC-06~11 · AC-37 |
 | `site/js/core/engine.js` | 전체 계산(snapshot)과 반영(reconcile: 미션 판정 기록 · 담당 변경 · 원본 삭제 · 자동 회복 감사 기록) | AC-16 · AC-47 · AC-79 |
-| `site/js/core/actions.js` | 사람 행동(출동 확정 · 조치 입력 · 보고서 제출 · 예외 판정 · 예산 승인 · 이의 · 재심 · 마감). 새 상태를 돌려주고 감사 기록을 덧붙임 | AC-19 · AC-23 · AC-34 · AC-40 · AC-44 |
+| `site/js/core/actions.js` | 사람 행동(출동 확정 · 조치 입력 · 보고서 제출 · 예외 · 재심 판정 초안과 확정 · 예산 승인 · 이의 · 마감). 새 상태를 돌려주고 감사 기록을 덧붙임(초안은 0줄) | AC-19 · AC-23 · AC-34 · AC-40 · AC-44 · AC-80~83 · AC-86 |
+| `site/js/core/warnings.js` | 사전 경고 6가지(판정 영향 · 관리 종료 · 담당 지정 막기 · 본사 직접 · 예산 회분 · 마감 비교). 순수 함수, 경고를 두는 행동 목록 한곳 | AC-84~90 |
 | `site/js/core/audit.js` | 감사 기록 덧붙이기만(고치기 · 지우기 없음), 개인정보 원문 0 | AC-34 · AC-35 |
 | `site/js/core/store.js` | localStorage 읽기 · 쓰기, 형식 버전, 깨지면 기본값 복구, 초기화 | AC-52 · AC-53 |
 | `site/js/core/time.js` | 시각 도구. 시연 시각은 저장 상태의 `clockH`(시작 2026-09-01 09:00 + '1시간 · 1일 앞으로')이고, 규칙은 이 값을 받아 쓴다 | AC-07 · AC-13 · AC-15 · AC-47 |
@@ -66,7 +67,7 @@ flowchart LR
 | `site/js/core/labels.js` | 설정값을 화면 · 기록 문구로 바꿈(예: 30000 → '3만 원'). 문구에 숫자를 직접 쓰지 않게 함 | R-4 |
 | `site/js/data/seed.js` | 가상 단지 · 설비 · 세대(가명 ID) · 시공사 · 계약 · 요금제 · 제휴 예산 | AC-51 |
 | `site/js/ui/*.js` | 역할별 화면(시공사 · 입주민 · 관리주체 · 본사) · 지도(SVG 배치도) · 본사 조치 입력 · 미션 참여 신청 | AC-20 · AC-42 · AC-72 · AC-76 |
-| `tests/*.test.mjs` | 수용 기준 79개를 모두 덮음(시험 83개, 끝 조건을 끝까지 돌리는 시험 2개 포함). 시험 이름에 AC 번호를 단다(`test_acNN_`, 한 시험이 여러 기준을 덮기도 하고 한 기준에 시험이 둘이기도 함), 정산 골든셋(`tests/golden/settlement.json`), 알람 사례 10가지, 레드팀 · 정상 대조군, innerHTML 0곳 검사 | AC-49 · AC-50 · AC-56 |
+| `tests/*.test.mjs` | 수용 기준 90개를 모두 덮음(시험 94개, 끝 조건을 끝까지 돌리는 시험 2개 포함). 시험 이름에 AC 번호를 단다(`test_acNN_`, 한 시험이 여러 기준을 덮기도 하고 한 기준에 시험이 둘이기도 함), 정산 골든셋(`tests/golden/settlement.json`), 알람 사례 10가지, 레드팀 · 정상 대조군, innerHTML 0곳 검사 | AC-49 · AC-50 · AC-56 |
 | `tools/run-tests.mjs` | 시험을 모두 돌려 `tmp/test-results.json` 1개를 남김. 건너뛴 시험은 통과로 세지 않음 | AC-56 |
 | `tools/secret_scan.mjs` | 저장소 안 비밀값 검사(배포 작업에서 실행). 값은 출력하지 않고 파일:줄만 | AC-54 |
 | `.github/workflows/pages.yml` | 검사 · 시험 · 올리기 작업 → `needs:`로 이은 **별도** 배포 작업 | AC-54 |
